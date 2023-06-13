@@ -5,9 +5,11 @@
 #include <cstdlib>
 #include <chrono>
 
-#ifdef GRAPH
+#define VERBOSE 1 
+// #define GRAPH 0
+// #ifdef GRAPH
     #include "graphs.hpp"
-#endif 
+// #endif 
 
 
 using namespace std; 
@@ -318,33 +320,18 @@ class A_star_Search {
 
 
     void update_node( Node*& n ) {
-        #ifdef VERBOSE
-        std::cout << "DOVREI FARE UPDATE PER " << *n << "...";
-        #endif
         int i = map.get_linear_coordinates( n->get_pos() );
         Node** p = &(frontier.at(i)); 
         if ( *p ) {
-            #ifdef VERBOSE
-            std::cout << "LO UPDATO... " << **p << "...";
-            #endif 
-            if ( (*p)->g_cost() > n->g_cost() ) {
-                // TODO DELETE 
-                *p = n; 
-                #ifdef VERBOSE
-                std::cout << "FATTO" << *n << "\n";
-                #endif
+
+            if ( (*p)->g_cost() > n->g_cost() ) { 
+                delete *p;
+                *p = n;
             }  
-            #ifdef VERBOSE
-            else { std::cout  << "NON ERA VERO("<< *n <<  ")\n"; }
-            #endif 
         }
         else {
             *p = n;
             ++n_open;
-            #ifdef VERBOSE
-            std::cout << "n open = " << n_open << "LO METTO" << *n << "\n";
-            #endif 
-            // frontier.at(i) = n;
         }
     }
 
@@ -367,15 +354,12 @@ class A_star_Search {
         Node* best = frontier.at(best_i);
         frontier.at(best_i) = nullptr;
         return best;
-        // return best;
     }
 
 
 
     void reconstruct_path( AgentPlan& plan_vector  ) {
         for ( Node *p = closedset.at( map.get_linear_coordinates( goal ) ); p; p = p->get_parent_node() ) { 
-
-            // plan_vector.emplace_back( p->get_pos(), p->get_action() );
             plan_vector.push_back( p->get_state() );
         }
 
@@ -391,17 +375,14 @@ public:
         
     }
 
-    void find_path( const Position& initial, const Position& goal, AgentPlan& plan_vector ) {
-        // std::cout << "INITIAL POSITION: " << initial << "\n"; 
-        // std::cout << "GOAL POSITION: " << goal << endl; 
+    bool find_path( const Position& initial, const Position& goal, AgentPlan& plan_vector ) { 
         this->goal = goal; 
 
         Node* starting_node = new Node( initial, goal ); 
-        // openset.push( starting_node ); 
         this->update_node( starting_node ); 
         
 
-        while ( n_open  /*!openset.empty()*/ ) {
+        while ( n_open ) {
             Node *curr = get_next();
 
             if ( curr->get_pos() == this->goal ) {
@@ -409,7 +390,7 @@ public:
                 this->set_visited( curr ); 
                 this->reconstruct_path( plan_vector );
 
-                return; 
+                return true; 
             }
 
             if ( ! this->has_been_visited( curr->get_pos() ) ) {
@@ -436,75 +417,74 @@ public:
                 this->set_visited( curr );        // marked current node as visited 
             }
         }
+
+        return false; 
     }
 
 
 };
 
 
-
-#ifdef GRAPH
 int main( int argc, char **argv ) {
-    GraphMap *map = nullptr; 
-    // Vertex initial, final; 
-    int initial = std::stoi(argv[2]), final = std::stoi( argv[3] ); 
+    if ( string( argv[1] ) == "map" ) {
+        Map *map = nullptr; 
+        Position initial, final; 
+        
 
-    GraphMapBuilder( argv[1], map); //, initial, final );
+        MapBuilder( argv[2], map, initial, final );
 
-    
 
-    map->visualize();
+        std::cout << "Initial: " << initial << "\nFinal: " << final << endl; 
+        map->visualize(initial, final);
 
-    vector<int> plan_nodes; 
 
-    A_star_GraphSearch a_star( *map ); 
-    a_star.find_path( 
-        *map->get_vertex(initial), *map->get_vertex(final), 
-        plan_nodes );
+        auto start_t = chrono::_V2::steady_clock::now(); 
+        AgentPlan plan; 
+        A_star_Search searcher( *map ); 
+        searcher.find_path( initial, final, plan ); 
 
-    for ( const int v: plan_nodes ){
-        std::cout << "Visit " << v << endl; 
+        auto end_t = chrono::_V2::steady_clock::now(); 
+
+        for (auto it = plan.begin(); it != plan.end(); ++it ) 
+            std::cout << *it << "\n"; 
+
+        // map->visualize(initial, final);
+
+        map->visualize( plan ); 
+
+        auto ns = chrono::duration_cast<chrono::nanoseconds>(end_t - start_t).count();
+        auto ms = ns / 1000000;
+        std::cout << "Planning time: " << ms  << "ms" << endl; 
+
+        delete map; 
     }
+    else {
+        GraphMap *map = nullptr; 
+        GraphMapBuilder( argv[2], map);
+        
+        int initial = std::stoi(argv[3]), 
+            final = std::stoi( argv[4] ); 
 
-    // A_star_Search searcher( *map ); 
-    // searcher.find_path( initial, final, plan ); 
+        vector<int> plan_nodes; 
+
+        auto start_t = chrono::_V2::steady_clock::now(); 
+
+        A_star_GraphSearch a_star( *map ); 
+        a_star.find_path( 
+            *map->get_vertex(initial), *map->get_vertex(final), 
+            plan_nodes );
+
+        auto end_t = chrono::_V2::steady_clock::now(); 
+
+        for ( const int v: plan_nodes ){
+            std::cout << "Visit " << *(map->get_vertex( v ))     << endl; 
+        }
+
+        auto ns = chrono::duration_cast<chrono::nanoseconds>(end_t - start_t).count();
+        auto mus = ns / 1000;
+        std::cout << "Planning time: " << mus  << "microsec" << endl; 
+
+        delete map;     
+    }
 }
-#endif 
 
-
-#ifndef GRAPH
-int main(int argc, char **argv) {
-    Map *map = nullptr; 
-    Position initial, final; 
-    
-
-    MapBuilder( argv[1], map, initial, final );
-
-
-    std::cout << "Initial: " << initial << "\nFinal: " << final << endl; 
-    map->visualize(initial, final);
-
-
-    auto start_t = chrono::_V2::steady_clock::now(); 
-    AgentPlan plan; 
-    A_star_Search searcher( *map ); 
-    searcher.find_path( initial, final, plan ); 
-
-    auto end_t = chrono::_V2::steady_clock::now(); 
-
-
-    #ifdef VERBOSE
-    for (auto it = plan.begin(); it != plan.end(); ++it ) 
-        std::cout << *it << "\n"; 
-    #endif 
-
-    map->visualize(initial, final);
-
-    map->visualize( plan ); 
-
-    auto ns = chrono::duration_cast<chrono::nanoseconds>(end_t - start_t).count();
-    auto ms = ns / 1000000;
-    std::cout << "Planning time: " << ms  << "ms" << endl; 
-
-} 
-#endif 

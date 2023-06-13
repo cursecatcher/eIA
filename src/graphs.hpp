@@ -30,7 +30,7 @@ public:
     }
 
     friend std::ostream& operator<<(std::ostream& os, const Vertex& v) {
-        os << "Vertex " << v.id;
+        os << "Vertex " << v.id << "( " << v.x << ", " << v.y << ")";
         return os; 
     }
     
@@ -56,6 +56,11 @@ public:
     : n_vertices( n_vertices ), 
       adj_matrix( vector<int>( n_vertices * n_vertices, 0 )) {
         vertices.resize( n_vertices );
+    }
+
+    ~GraphMap() {
+        for ( auto it = vertices.begin(); it != vertices.end(); ++it)
+            delete *it; 
     }
 
     inline void add_vertex( int n, int x, int y ) {
@@ -106,35 +111,26 @@ public:
     }
 
 
-    
-
-
 };
 
 
 class GraphMapBuilder {
 public:
-    GraphMapBuilder(const string& filename, GraphMap*&map ) { //, Vertex& initial, Vertex& final) {
+    GraphMapBuilder(const string& filename, GraphMap*&map ) { 
         ifstream f( filename ); 
         string line; 
-        // vector<string> lines; 
         
         int n_vertices, n_edges; 
         f >> n_vertices; 
         map = new GraphMap( n_vertices );
-        // getline(f, line); 
 
         std::cout << "INIT GRAPH W/ " << n_vertices << " vertices\n"; 
         int id, x, y;
         
 
         for (int i = 0; i < n_vertices; ++i) {
-            // getline( f, line );
             f >> id >> line >> x >> y; 
-
-            std::cout << "CREO VERTICE PER " << line << endl; 
             map->add_vertex( id, x, y );
-            // map->add_vertex( i );
         }
 
         f >> n_edges;
@@ -143,10 +139,7 @@ public:
         for (int i = 0; i < n_edges; ++i ) {
             f >> u >> v >> w; 
             map->add_edge( u, v, w );
-            // std::cout << "LETTO " << u << ", " << v  << " => " <<  map->get(u,v) << "\n";
         }
-
-
     }
 };
 
@@ -183,7 +176,6 @@ public:
     }
 
 
-
     // Overload the less-than operator to define the ordering
     bool operator<(const GraphNode& other) const {
         return this->f > other.f; 
@@ -204,35 +196,31 @@ class A_star_GraphSearch {
     const Vertex *goal = nullptr;
 
     
-    bool has_been_visited( const Vertex& v ) const {
+    inline bool has_been_visited( const Vertex& v ) const {
         return this->closedset.at( v.id ) != nullptr;
     }
 
-    bool has_been_visited( const int id ) const {
+    inline bool has_been_visited( const int id ) const {
         return this->closedset.at( id ) != nullptr; 
     }
 
-    void set_visited( GraphNode*& n ) {
+    inline void set_visited( GraphNode*& n ) {
         this->closedset.at( n->v.id ) = n; 
     }
 
 
-    void update_node( GraphNode*& n ) {
-        int v_id = n->v.id; 
-        GraphNode** p = &(openset.at( v_id ));
+    inline void update_node( GraphNode*& n ) {
+        GraphNode** p = &(openset.at( n->v.id ));
 
-        if ( *p ) {
-            std::cout << "SOSTITUZIONE FORSE...."; 
-            if ( (*p)->g_cost > n->g_cost ) {
-                //TODO DELETE 
-                *p = n; 
-                std::cout << "SI!\n"; 
-            } else { std::cout << " E INVECE NO\n"; }         
-        }
-        else {
+        if ( *p == nullptr ) {
+            //add a new node 
             *p = n; 
             ++n_open; 
-            std::cout << "n open = " << n_open << "LO METTO" << *n << "\n";
+        }
+        else if ( (*p)->g_cost > n->g_cost ) {
+            //replace node
+            delete *p;
+            *p = n; 
         }
     }
 
@@ -255,7 +243,6 @@ class A_star_GraphSearch {
         GraphNode* best = openset.at(best_i);
         openset.at(best_i) = nullptr;
 
-        std::cout << "Next node to expand: " << *best << "\n"; 
         return best;
     }
 
@@ -265,12 +252,19 @@ class A_star_GraphSearch {
         GraphNode* final = closedset.at( goal->id );
         
         for ( const GraphNode* p = final; p; p = p->get_parent_node() ) {
-            std::cout << "Visited: " << *p << endl; 
             plan_vector.push_back( p->v.id );
         }
 
         reverse( plan_vector.begin(), plan_vector.end() );
 
+    }
+
+    void release_memory() {
+        for (auto it = closedset.begin(); it != closedset.end(); ++it)
+            delete *it; 
+
+        for (auto it = openset.begin(); it != openset.end(); ++it)
+            delete *it; 
     }
 
 
@@ -281,9 +275,13 @@ public:
         openset( vector<GraphNode*>( graph.n_vertices, nullptr )) { 
     }
 
-    void find_path( const Vertex& initial, const Vertex& goal, vector<int>& solution_vector ) {
+
+
+    bool find_path( const Vertex& initial, const Vertex& goal, vector<int>& solution_vector ) {
         std::cout << "A* algorithm from " << initial << " to " << goal << "...\n"; 
         this->goal = &goal; 
+
+        solution_vector.clear(); 
 
         GraphNode* starting_node = new GraphNode( initial, goal );   
         update_node( starting_node );
@@ -297,12 +295,11 @@ public:
 
                 set_visited( curr );
                 reconstruct_path( solution_vector ); 
-                return; 
+                break;
             }
 
             if ( ! has_been_visited( curr->v ) ) {
                 for ( const int neighbor: curr->v.get_neighbors() ) {
-                    // std::cout << "QUESTO NODO HA VICINO " << neighbor << "\n"; 
 
                     if ( !has_been_visited( neighbor ) ) {
                         const Vertex* v_neighbor = graph.get_vertex( neighbor ); 
@@ -322,38 +319,8 @@ public:
             }
 
         }
-        
-
+        release_memory();
+        return solution_vector.size() > 0;
     }
 };
 
-
-/*
-class A_star_GraphSearch {
-    const GraphMap& map;                  // the agent world 
-    
-    vector<Node*> frontier;         //a vector containing pointers to unexplored nodes that have to be visited 
-    int n_open = 0; 
-
-    vector<Node*> closedset;         //a vector containing visited nodes
-
-    Position goal; 
-    const vector<AgentAction> actions = { UP, DOWN, LEFT, RIGHT };
-
-    bool has_been_visited( const Position& p) const {
-        return this->closedset.at( map.get_linear_coordinates( p ) ) != nullptr; 
-    }
-
-    void set_visited( Node*& n ) {
-        this->closedset.at( map.get_linear_coordinates( n->get_pos() ) ) = n; 
-        // std::cout << "Node " << *n << " marked as visited\n"; 
-    }
-public: 
-      A_star_Search( const Map& map ) : 
-        map( map ), 
-        frontier( vector<Node*>( map.nrows * map.ncols, nullptr )),
-        closedset( vector<Node*>( map.nrows * map.ncols, nullptr )  ) {
-
-        
-    }
-}; */
