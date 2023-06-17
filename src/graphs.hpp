@@ -110,7 +110,9 @@ public:
         }
     }
 
-
+    const vector<int>& get_adj_matrix() const {
+        return adj_matrix;
+    }
 };
 
 

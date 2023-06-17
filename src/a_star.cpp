@@ -35,17 +35,17 @@ std::ostream& operator<<(std::ostream& os, const AgentAction& a) {
 
 
 
-/* Just an auxiliary function to see priority queue content */
-template<typename Q>
-void print_queue(std::string name, Q q)
-{
-    std::cout << "PRIORITY QUEUE CONTENT:  ";
-    // NB: q is passed by value because there is no way to traverse
-    // priority_queue's content without erasing the queue.
-    for (std::cout << name << ":\n"; !q.empty(); q.pop())
-        std::cout << q.top() << '\n';
-    std::cout << "END\n\n";
-}
+// /* Just an auxiliary function to see priority queue content */
+// template<typename Q>
+// void print_queue(std::string name, Q q)
+// {
+//     std::cout << "PRIORITY QUEUE CONTENT:  ";
+//     // NB: q is passed by value because there is no way to traverse
+//     // priority_queue's content without erasing the queue.
+//     for (std::cout << name << ":\n"; !q.empty(); q.pop())
+//         std::cout << q.top() << '\n';
+//     std::cout << "END\n\n";
+// }
 
 
 class Position {
@@ -464,6 +464,8 @@ int main( int argc, char **argv ) {
         
         int initial = std::stoi(argv[3]), 
             final = std::stoi( argv[4] ); 
+
+
 
         vector<int> plan_nodes; 
 
